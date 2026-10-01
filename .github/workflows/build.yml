@@ -110,6 +110,6 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           artifacts: "release-files/*"
-          generateReleaseNotes: true
+          generateReleaseNotes: false
           makeLatest: true
           token: ${{ secrets.GITHUB_TOKEN }}
