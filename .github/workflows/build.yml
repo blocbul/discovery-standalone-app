@@ -99,9 +99,18 @@ jobs:
         with:
           path: artifacts
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: artifacts/**/*
+      - name: Create Release with gh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          gh release create "$TAG_NAME" --repo "$GITHUB_REPOSITORY" --generate-notes || true
+
+      - name: Upload release assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          find artifacts -type f | while read file; do
+            gh release upload "$TAG_NAME" "$file" --repo "$GITHUB_REPOSITORY" --clobber
+          done
