@@ -6,17 +6,13 @@ on:
       - 'v*'
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-
+  build-windows:
+    runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
@@ -27,31 +23,85 @@ jobs:
         run: npm install
 
       - name: Build Windows
-        if: matrix.os == 'windows-latest'
         working-directory: files_app_discovery
         run: npm run build-win
 
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: files_app_discovery/dist/
+          retention-days: 5
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'files_app_discovery/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: files_app_discovery
+        run: npm install
+
       - name: Build macOS
-        if: matrix.os == 'macos-latest'
         working-directory: files_app_discovery
         run: npm run build-mac
 
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-build
+          path: files_app_discovery/dist/
+          retention-days: 5
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'files_app_discovery/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: files_app_discovery
+        run: npm install
+
       - name: Build Linux
-        if: matrix.os == 'ubuntu-latest'
         working-directory: files_app_discovery
         run: npm run build
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-build
+          name: linux-build
           path: files_app_discovery/dist/
           retention-days: 5
 
+  release:
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
       - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          files: files_app_discovery/dist/**/*
+          files: artifacts/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
