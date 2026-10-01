@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.exe
+*.dmg
+*.zip
+*.blockmap
+.DS_Store
+.env
+.env.local
+build/
+win-unpacked/

@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flows Discovery</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .api-section { background: #f9f9f9; padding: 20px; margin-bottom: 20px; border-radius: 8px; border-left: 4px solid #667eea; }
+        .api-section h3 { margin-bottom: 15px; color: #333; font-size: 16px; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 14px; }
+        .form-group input, .form-group select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; }
+        .btn-api { padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; margin-right: 8px; margin-bottom: 8px; }
+        .btn-api:hover { background: #5568d3; }
+        .status-badge { display: inline-block; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; margin-bottom: 15px; }
+        .status-ok { background: #d4edda; color: #155724; }
+        .status-error { background: #f8d7da; color: #721c24; }
+        .appliances-grid { display: grid; gap: 8px; margin-bottom: 15px; }
+        .appliance-btn { padding: 10px; background: white; border: 2px solid #ddd; border-radius: 4px; cursor: pointer; text-align: left; font-size: 13px; }
+        .appliance-btn:hover { border-color: #667eea; background: #f0f4ff; }
+        .appliance-btn.selected { border-color: #667eea; background: #667eea; color: white; }
+
+        .upload-section {
+            margin-bottom: 30px;
+        }
+
+        .button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .status.show {
+            display: block;
+        }
+
+        .status.info {
+            background: #e3f2fd;
+            color: #1565c0;
+            border-left: 4px solid #1565c0;
+        }
+
+        .status.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border-left: 4px solid #2e7d32;
+        }
+
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+            border-left: 4px solid #c62828;
+        }
+
+        .status.loading {
+            background: #fff3e0;
+            color: #e65100;
+            border-left: 4px solid #e65100;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(230, 81, 0, 0.3);
+            border-top: 2px solid #e65100;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .results-section {
+            display: none;
+        }
+
+        .results-section.show {
+            display: block;
+        }
+
+        .results-header {
+            margin-bottom: 20px;
+        }
+
+        .results-header h2 {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .results-header p {
+            color: #999;
+            font-size: 14px;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        table thead {
+            background: #f5f5f5;
+        }
+
+        table th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #ddd;
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s ease;
+        }
+
+        table th:hover {
+            background-color: #e8e8e8;
+        }
+
+        table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #eee;
+        }
+
+        table tbody tr:hover {
+            background: #f9f9f9;
+        }
+
+        .direction-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 12px;
+        }
+
+        .direction-badge.lanwan {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .direction-badge.wanlan {
+            background: #f3e5f5;
+            color: #6a1b9a;
+        }
+
+        .ip-address {
+            font-family: 'Courier New', monospace;
+            color: #555;
+        }
+
+        .packet-count {
+            text-align: center;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .export-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            text-align: right;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .button-secondary {
+            background: #f5f5f5;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+
+        .button-secondary:hover {
+            background: #efefef;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .no-data-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Flows Discovery</h1>
+        </header>
+
+        <div class="content">
+            <!-- API Section -->
+            <div class="api-section" id="apiSection">
+                <h3>🚀 Execute Flows</h3>
+                
+                <div id="authStatus" class="status-badge status-error">Non connecté</div>
+
+                <div class="form-group">
+                    <label>API URL</label>
+                    <input type="text" id="proxyUrl" value="https://api.extremecloudiq.com/sdwan/xapi">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="text" id="email" placeholder="user@company.com" autofocus>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="password" placeholder="••••••••">
+                </div>
+                <button class="btn-api" onclick="apiLogin()">🔓 Login</button>
+                <button class="btn-api" onclick="apiLogout()">🔐 Logout</button>
+
+                <div id="appliancesDiv" style="display: none; margin-top: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500;">Select Appliance</label>
+                    <input type="text" id="applianceSearch" placeholder="Search appliances..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 10px; font-size: 14px;" onkeyup="filterAppliances()">
+                    <select id="applianceSelect" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; cursor: pointer;" onchange="selectApplianceFromSelect()">
+                        <option value="">-- Choose an appliance --</option>
+                    </select>
+                </div>
+
+                <div id="executeDiv" style="display: none; margin-top: 20px;">
+                    <button class="btn-api" onclick="apiExecuteFlows()" style="background: #27ae60; width: 100%;">▶️ Launch Discovery</button>
+                    <div id="progressDiv" style="display: none; margin-top: 15px; padding: 15px; background: #f0f4ff; border-radius: 4px;">
+                        <div id="progressMessage">⏳ Launching...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Parser Section -->
+            <h2 id="parserTitle" style="display: none; margin-top: 30px; margin-bottom: 15px;">📊 Flows Results</h2>
+            <!-- Status Message -->
+            <div id="status" class="status"></div>
+
+            <!-- Results Section -->
+            <div id="resultsSection" class="results-section">
+                <div class="results-header">
+                    <h2>Parsing Results</h2>
+                    <p id="resultsSummary"></p>
+                </div>
+                <div style="margin-bottom: 20px; padding: 15px; background: #f9f9f9; border-radius: 6px;">
+                    <h3 style="margin-bottom: 15px; color: #333; font-size: 14px;">🔎 Filters</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-size: 12px; color: #666; font-weight: 500;">Source IP</label>
+                            <input type="text" id="filterSourceIP" placeholder="Filtrer par IP source..." 
+                                style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;"
+                                onkeyup="applyFilters()">
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-size: 12px; color: #666; font-weight: 500;">Destination IP</label>
+                            <input type="text" id="filterDestIP" placeholder="Filtrer par IP destination..." 
+                                style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;"
+                                onkeyup="applyFilters()">
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-size: 12px; color: #666; font-weight: 500;">Application</label>
+                            <input type="text" id="filterApp" placeholder="Filtrer par application..." 
+                                style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;"
+                                onkeyup="applyFilters()">
+                        </div>
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table id="resultsTable">
+                        <thead>
+                            <tr>
+                                <th onclick="sortTable(0)" style="cursor: pointer;">Direction</th>
+                                <th onclick="sortTable(1)" style="cursor: pointer;">Protocol</th>
+                                <th onclick="sortTable(2)" style="cursor: pointer;">Source IP</th>
+                                <th onclick="sortTable(3)" style="cursor: pointer;">Source Port</th>
+                                <th onclick="sortTable(4)" style="cursor: pointer;">Destination IP</th>
+                                <th onclick="sortTable(5)" style="cursor: pointer;">Destination Port</th>
+                                <th onclick="sortTable(6)" style="cursor: pointer;">Application</th>
+                                <th onclick="sortTable(7)" style="cursor: pointer;">Packets</th>
+                                <th onclick="sortTable(8)" style="cursor: pointer;">Age</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsBody">
+                        </tbody>
+                    </table>
+                </div>
+                <div id="noDataMessage" class="no-data" style="display: none;">
+                    <div class="no-data-icon">📭</div>
+                    <p>No flows found dans le fichier</p>
+                </div>
+                <div class="export-section">
+                    <div class="button-group">
+                        <button class="button button-secondary" onclick="exportToCSV()">📥 Export as CSV</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+        const resultsSection = document.getElementById('resultsSection');
+        const resultsBody = document.getElementById('resultsBody');
+        const noDataMessage = document.getElementById('noDataMessage');
+        let flowsData = [];
+
+        function showStatus(message, type = 'info') {
+            statusDiv.textContent = message;
+            statusDiv.className = `status show ${type}`;
+            if (type === 'loading') {
+                statusDiv.innerHTML = `<span class="spinner"></span>${message}`;
+            }
+        }
+
+        async function handleFile(file) {
+            try {
+                showStatus('Lecture du fichier ZIP...', 'loading');
+
+                const arrayBuffer = await file.arrayBuffer();
+                const zip = new JSZip();
+                await zip.loadAsync(arrayBuffer);
+
+                // Find the DDDDDD_HHHHHH/appliances/xxxx.txt file
+                showStatus('Recherche du fichier texte dans le ZIP...', 'loading');
+                
+                let textFile = null;
+                let fileName = null;
+
+                for (const [path, file] of Object.entries(zip.files)) {
+                    // Look for pattern: DDDDDD_HHHHHH/appliances/*.txt
+                    const regex = /\d{6}_\d{6}\/appliances\/.*\.txt$/;
+                    if (regex.test(path)) {
+                        textFile = file;
+                        fileName = path;
+                        break;
+                    }
+                }
+
+                if (!textFile) {
+                    showStatus('❌ Impossible de trouver le fichier texte. Format attendu: DDDDDD_HHHHHH/appliances/xxxx.txt', 'error');
+                    return;
+                }
+
+                showStatus(`Parsing du fichier: ${fileName}`, 'loading');
+                const content = await textFile.async('string');
+
+                // Parse the content
+                const flows = parseFlows(content);
+
+                if (flows.length === 0) {
+                    showStatus('⚠️ No flows found. Check that the block "+ debug dump flow -d" exists in the file.', 'warning');
+                    noDataMessage.style.display = 'block';
+                    resultsBody.innerHTML = '';
+                    resultsSection.classList.add('show');
+                    return;
+                }
+
+                displayResults(flows);
+                showStatus(`✅ Parsing réussi: ${flows.length} flux trouvé(s)`, 'success');
+
+            } catch (error) {
+                console.error(error);
+                showStatus(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        function parseFlows(content) {
+            const flows = [];
+            const lines = content.split('\n');
+
+            // Find the start of the debug dump flow block
+            let startIndex = -1;
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].includes('+ debug dump flow -d')) {
+                    startIndex = i + 1;
+                    break;
+                }
+            }
+
+            if (startIndex === -1) {
+                return flows;
+            }
+
+            // Parse lines starting with < or >
+            for (let i = startIndex; i < lines.length; i++) {
+                const line = lines[i].trim();
+
+                if (!line.startsWith('<') && !line.startsWith('>')) {
+                    continue;
+                }
+
+                const flow = parseLine(line);
+                if (flow) {
+                    flows.push(flow);
+                }
+            }
+
+            return flows;
+        }
+
+        function parseLine(line) {
+            try {
+                const direction = line.charAt(0); // < or >
+                
+                // Split by comma to find relevant fields
+                const parts = line.substring(1).split(',').map(p => p.trim());
+
+                if (parts.length < 3) {
+                    return null;
+                }
+
+                // Protocol is typically after the direction
+                const protocol = parts[0] || '';
+
+                // Find the IP addresses and ports
+                // They are typically in format: IP_source:Port_source - IP_destination:Port_destination
+                let ipPart = '';
+                let applicationPart = '';
+                let packetsPart = '';
+
+                for (let i = 1; i < parts.length; i++) {
+                    if (parts[i].includes(':') && parts[i].includes('-')) {
+                        ipPart = parts[i];
+                    } else if (parts[i].includes('pkts')) {
+                        packetsPart = parts[i];
+                    } else if (ipPart && !applicationPart) {
+                        applicationPart = parts[i];
+                    }
+                }
+
+                // Parse IP and ports
+                const ipMatch = ipPart.match(/(\d+\.\d+\.\d+\.\d+):(\d+)\s*-\s*(\d+\.\d+\.\d+\.\d+):(\d+)/);
+                if (!ipMatch) {
+                    return null;
+                }
+
+                const sourceIP = ipMatch[1];
+                const sourcePort = ipMatch[2];
+                const destIP = ipMatch[3];
+                const destPort = ipMatch[4];
+
+                // Extract packet count
+                const packetsMatch = packetsPart.match(/(\d+)\s*pkts?/);
+                const packets = packetsMatch ? packetsMatch[1] : 'N/A';
+
+                // Extract age from the line
+                const ageMatch = line.match(/age\s*(\d+)/i);
+                const age = ageMatch ? ageMatch[1] : 'N/A';
+
+                // Map direction
+                const directionText = direction === '>' ? 'LAN>WAN' : 'WAN>LAN';
+
+                // Truncate application at first closing parenthesis
+                let truncatedApp = applicationPart || '-';
+                const closeParenIndex = truncatedApp.indexOf(')');
+                if (closeParenIndex !== -1) {
+                    truncatedApp = truncatedApp.substring(0, closeParenIndex + 1);
+                }
+
+                return {
+                    direction: directionText,
+                    rawDirection: direction,
+                    sourceIP,
+                    sourcePort,
+                    destIP,
+                    destPort,
+                    application: truncatedApp,
+                    packets,
+                    age,
+                    protocol
+                };
+
+            } catch (error) {
+                console.error('Error parsing line:', line, error);
+                return null;
+            }
+        }
+
+        function displayResults(flows) {
+            flowsData = flows;
+            resultsBody.innerHTML = '';
+            noDataMessage.style.display = 'none';
+
+            flows.forEach(flow => {
+                const row = document.createElement('tr');
+                const badgeClass = flow.rawDirection === '>' ? 'lanwan' : 'wanlan';
+                
+                row.innerHTML = `
+                    <td>
+                        <span class="direction-badge ${badgeClass}">${flow.direction}</span>
+                    </td>
+                    <td>${flow.protocol}</td>
+                    <td><span class="ip-address">${flow.sourceIP}</span></td>
+                    <td><span class="ip-address">${flow.sourcePort}</span></td>
+                    <td><span class="ip-address">${flow.destIP}</span></td>
+                    <td><span class="ip-address">${flow.destPort}</span></td>
+                    <td>${flow.application}</td>
+                    <td><span class="packet-count">${flow.packets}</span></td>
+                    <td><span class="packet-count">${flow.age}</span></td>
+                `;
+                resultsBody.appendChild(row);
+            });
+
+            document.getElementById('resultsSummary').textContent = `Total: ${flows.length} network flows detected(s)`;
+            resultsSection.classList.add('show');
+            
+            // Apply existing filters to new data (immediate, no delay)
+            applyFilters();
+        }
+
+        function exportToCSV() {
+            if (flowsData.length === 0) {
+                alert('No data to export');
+                return;
+            }
+
+            let csv = 'Direction,Protocol,Source IP,Source Port,Destination IP,Destination Port,Application,Packets,Age\n';
+            
+            flowsData.forEach(flow => {
+                csv += `"${flow.direction}","${flow.protocol}","${flow.sourceIP}","${flow.sourcePort}","${flow.destIP}","${flow.destPort}","${flow.application}","${flow.packets}","${flow.age}"\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `flows_${new Date().getTime()}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        function resetParser() {
+            resultsBody.innerHTML = '';
+            flowsData = [];
+            statusDiv.classList.remove('show');
+            resultsSection.classList.remove('show');
+            noDataMessage.style.display = 'none';
+            uploadArea.classList.remove('dragover');
+            document.getElementById('filterSourceIP').value = '';
+            document.getElementById('filterDestIP').value = '';
+            document.getElementById('filterApp').value = '';
+            currentSortColumn = -1;
+            sortDirection = 1;
+        }
+
+        let currentSortColumn = -1;
+        let sortDirection = 1; // 1 for ascending, -1 for descending
+
+        function sortTable(columnIndex) {
+            const rows = Array.from(resultsBody.querySelectorAll('tr'));
+            
+            if (currentSortColumn === columnIndex) {
+                sortDirection *= -1;
+            } else {
+                sortDirection = 1;
+                currentSortColumn = columnIndex;
+            }
+
+            rows.sort((a, b) => {
+                let aValue = a.cells[columnIndex].textContent.trim();
+                let bValue = b.cells[columnIndex].textContent.trim();
+
+                // Remove badge HTML for direction column
+                if (columnIndex === 0) {
+                    aValue = a.cells[columnIndex].querySelector('.direction-badge').textContent;
+                    bValue = b.cells[columnIndex].querySelector('.direction-badge').textContent;
+                }
+
+                // Try to parse as numbers
+                const aNum = parseFloat(aValue);
+                const bNum = parseFloat(bValue);
+                
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    return (aNum - bNum) * sortDirection;
+                }
+
+                // String comparison
+                return aValue.localeCompare(bValue) * sortDirection;
+            });
+
+            rows.forEach(row => resultsBody.appendChild(row));
+            
+            // Re-apply filters after sorting
+            applyFilters();
+        }
+
+        function applyFilters() {
+            const filterSourceIP = document.getElementById('filterSourceIP').value.toLowerCase();
+            const filterDestIP = document.getElementById('filterDestIP').value.toLowerCase();
+            const filterApp = document.getElementById('filterApp').value.toLowerCase();
+
+            const rows = resultsBody.querySelectorAll('tr');
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                const sourceIP = row.cells[2].textContent.trim().toLowerCase();
+                const destIP = row.cells[4].textContent.trim().toLowerCase();
+                const app = row.cells[6].textContent.trim().toLowerCase();
+
+                const matchSource = sourceIP.includes(filterSourceIP);
+                const matchDest = destIP.includes(filterDestIP);
+                const matchApp = app.includes(filterApp);
+
+                if (matchSource && matchDest && matchApp) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            // Update summary with filtered count
+            if (visibleCount === 0) {
+                noDataMessage.style.display = 'block';
+            } else {
+                noDataMessage.style.display = 'none';
+            }
+            document.getElementById('resultsSummary').textContent = `Total: ${flowsData.length} network flows | Displayed: ${visibleCount}`;
+        }
+
+        // ===== API Functions =====
+        let apiToken = null;
+        let selectedAppliance = null;
+        let currentRequestId = null;
+
+        function updateApiUI() {
+            const status = document.getElementById('authStatus');
+            const appDiv = document.getElementById('appliancesDiv');
+            const execDiv = document.getElementById('executeDiv');
+            if (apiToken) {
+                status.className = 'status-badge status-ok';
+                status.textContent = '✓ Connecté';
+                appDiv.style.display = 'block';
+                execDiv.style.display = 'block';
+            } else {
+                status.className = 'status-badge status-error';
+                status.textContent = '✗ Non connecté';
+                appDiv.style.display = 'none';
+                execDiv.style.display = 'none';
+            }
+        }
+
+        async function apiLogin() {
+            const proxyUrl = document.getElementById('proxyUrl').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!proxyUrl || !email || !password) {
+                alert('Fill in all fields:\n- API URL\n- Email\n- Password');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${proxyUrl}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: email, password })
+                });
+                
+                const text = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    alert('API Error: Invalid response (not JSON)\n\nCheck your API URL');
+                    console.error('Response:', text.substring(0, 200));
+                    return;
+                }
+                
+                if (response.ok && data.access_token) {
+                    apiToken = data.access_token;
+                    updateApiUI();
+                    await apiLoadAppliances();
+                } else {
+                    alert('Login failed:\n' + (data.error_message || 'Invalid credentials'));
+                }
+            } catch (e) {
+                alert('Connection error:\n' + e.message + '\n\nCheck:\n1. API URL is correct\n2. Network is working');
+            }
+        }
+
+        async function apiLogout() {
+            const proxyUrl = document.getElementById('proxyUrl').value;
+            try {
+                await fetch(`${proxyUrl}/logout`, { method: 'POST', headers: { 'Authorization': `Bearer ${apiToken}` } });
+                apiToken = null;
+                updateApiUI();
+            } catch (e) {}
+        }
+
+        let allAppliances = [];
+        
+        async function apiLoadAppliances() {
+            if (!apiToken) { alert('Connect first'); return; }
+            const proxyUrl = document.getElementById('proxyUrl').value;
+            try {
+                const response = await fetch(`${proxyUrl}/configuration/v1/appliances`, {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${apiToken}` }
+                });
+                
+                if (!response.ok) {
+                    alert(`API Error ${response.status}: ${response.statusText}\n\nCheck:\n1. Your API URL is correct\n2. Your login token is valid\n3. Your network connection`);
+                    return;
+                }
+                
+                const text = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    alert('API returned invalid JSON. Check your API URL and authentication.');
+                    console.error('Response:', text.substring(0, 200));
+                    return;
+                }
+                
+                if (response.ok && data.data) {
+                    // Charger la management_ip pour chaque appliance
+                    for (const appliance of data.data) {
+                        const lanResponse = await fetch(`${proxyUrl}/configuration/v1/appliances/${appliance.id}/lan-settings`, {
+                            method: 'GET',
+                            headers: { 'Authorization': `Bearer ${apiToken}` }
+                        });
+                        const lanData = await lanResponse.json();
+                        if (lanResponse.ok && lanData.data?.lan_interfaces) {
+                            const mainInterface = lanData.data.lan_interfaces.find(i => i.is_main);
+                            if (mainInterface?.local_parameters?.management_ip_address) {
+                                appliance.management_ip = mainInterface.local_parameters.management_ip_address;
+                            }
+                        }
+                    }
+
+                    allAppliances = data.data;
+                    const select = document.getElementById('applianceSelect');
+                    select.innerHTML = '<option value="">-- Choose an appliance --</option>';
+                    
+                    data.data.forEach(appliance => {
+                        const option = document.createElement('option');
+                        option.value = appliance.id;
+                        option.textContent = `${appliance.name} (${appliance.management_ip || 'N/A'})`;
+                        option.dataset.appliance = JSON.stringify(appliance);
+                        select.appendChild(option);
+                    });
+                }
+            } catch (e) {
+                alert('Error: ' + e.message);
+                console.error(e);
+            }
+        }
+        
+        function filterAppliances() {
+            const searchText = document.getElementById('applianceSearch').value.toLowerCase();
+            const select = document.getElementById('applianceSelect');
+            const options = select.querySelectorAll('option');
+            
+            options.forEach((option, index) => {
+                if (index === 0) return; // Skip placeholder
+                const text = option.textContent.toLowerCase();
+                option.style.display = text.includes(searchText) ? '' : 'none';
+            });
+        }
+        
+        function selectApplianceFromSelect() {
+            const select = document.getElementById('applianceSelect');
+            const selectedOption = select.options[select.selectedIndex];
+            if (selectedOption.value && selectedOption.dataset.appliance) {
+                selectedAppliance = JSON.parse(selectedOption.dataset.appliance);
+            } else {
+                selectedAppliance = null;
+            }
+        }
+
+        async function apiExecuteFlows() {
+            if (!apiToken || !selectedAppliance) { alert('Connect and select an appliance'); return; }
+            const proxyUrl = document.getElementById('proxyUrl').value;
+            const progressDiv = document.getElementById('progressDiv');
+            const progressMessage = document.getElementById('progressMessage');
+            
+            try {
+                progressDiv.style.display = 'block';
+                progressMessage.textContent = '⏳ Launching Discovery...';
+                
+                const executeResponse = await fetch(`${proxyUrl}/tools/v1/scripts/execute/flows`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` },
+                    body: JSON.stringify({ data: [{ appliance: { serial_number: selectedAppliance.serial_number || '', name: selectedAppliance.name || '', management_ip: selectedAppliance.management_ip || '' } }] })
+                });
+                const executeData = await executeResponse.json();
+                if (!executeResponse.ok) { alert('Error: ' + JSON.stringify(executeData)); progressDiv.style.display = 'none'; return; }
+                const requestId = executeData.data?.[0]?.request_id;
+                currentRequestId = requestId;
+                
+                // Auto-poll for results
+                progressMessage.textContent = `⏳ Running Discovery (Request ID: ${requestId.substring(0, 8)}...)`;
+                
+                for (let i = 0; i < 10; i++) {
+                    await new Promise(r => setTimeout(r, 5000));
+                    progressMessage.textContent = `⏳ Checking results... (attempt ${i+1}/10)`;
+                    
+                    try {
+                        const resultResponse = await fetch(`${proxyUrl}/tools/v1/scripts/result?request_id=${requestId}`, {
+                            method: 'GET',
+                            headers: { 'Authorization': `Bearer ${apiToken}` }
+                        });
+                        
+                        if (resultResponse.ok) {
+                            const resultData = await resultResponse.json();
+                            const uri = resultData.data?.[0]?.uri;
+                            
+                            if (uri) {
+                                progressMessage.textContent = '⏳ Downloading results...';
+                                const downloadUrl = `${proxyUrl}/tools/v1/scripts/result/download?file_path=${uri}`;
+                                const downloadResponse = await fetch(downloadUrl, {
+                                    method: 'GET',
+                                    headers: { 'Accept': '*/*', 'Accept-Encoding': 'gzip, deflate, br', 'Authorization': `Bearer ${apiToken}` }
+                                });
+                                
+                                if (downloadResponse.ok) {
+                                    const blob = await downloadResponse.blob();
+                                    progressMessage.textContent = '⏳ Parsing flows...';
+                                    await handleFile(blob);
+                                    
+                                    // Delete result silently
+                                    try {
+                                        await fetch(`${proxyUrl}/tools/v1/scripts/result/delete`, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` },
+                                            body: JSON.stringify({ data: [{ request_id: requestId }] })
+                                        });
+                                    } catch (e) {
+                                        console.log('Delete result failed:', e);
+                                    }
+                                    
+                                    document.getElementById('parserTitle').style.display = 'block';
+                                    progressDiv.style.display = 'none';
+                                    return;
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.log('Attempt failed, retrying...');
+                    }
+                }
+                
+                progressMessage.textContent = '❌ Discovery did not complete within 50 seconds';
+                setTimeout(() => { progressDiv.style.display = 'none'; }, 3000);
+                
+            } catch (e) {
+                alert('Error: ' + e.message);
+                progressDiv.style.display = 'none';
+            }
+        }
+
+        updateApiUI();
+    </script>
+</body>
+</html>
