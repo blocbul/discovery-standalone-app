@@ -6,7 +6,7 @@
   "homepage": "./",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder",
+    "build": "electron-builder --linux",
     "build-win": "electron-builder --win --publish=never",
     "build-mac": "electron-builder --mac --publish=never"
   },
