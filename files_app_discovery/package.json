@@ -31,6 +31,9 @@
     "mac": {
       "target": ["dmg", "zip"],
       "category": "public.app-category.utilities"
+    },
+    "linux": {
+      "target": ["AppImage", "zip"]
     }
   },
   "devDependencies": {
